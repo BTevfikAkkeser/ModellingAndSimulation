@@ -97,6 +97,19 @@ class Hole:
         distance = math.sqrt((self.x - ball.x) ** 2 + (self.y - ball.y) ** 2)
         return distance <= self.radius
 
+class Puddle:
+    def __init__(self, x, y, radius=20):
+        self.x = x
+        self.y = y
+        self.radius = radius
+
+    def show(self, window):
+        pg.draw.circle(window, (0, 0, 255, 100), (int(self.x), int(self.y)), self.radius)  # Su birikintisi mavi
+
+    def check_collision(self, ball):
+        distance = math.sqrt((self.x - ball.x) ** 2 + (self.y - ball.y) ** 2)
+        return distance <= self.radius + ball.radius  # Topun yarıçapını da ekleyin
+
 def main():
     pg.init()
     window = pg.display.set_mode((Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT))
@@ -112,10 +125,14 @@ def main():
     aiming_screen = True
     aiming_start_time = None
 
-    previous_positions = []
-
     dragging = False
     drag_start_x, drag_start_y = 0, 0
+
+    is_ball_stopped = False
+    hit_puddle = False  # Su birikintisine çarpma durumu için bayrak
+    last_stop_position = (ball.x, ball.y, ball.z)
+
+    puddles = [Puddle(300, 400), Puddle(500, 300)]  # Su birikintileri ekleniyor
 
     while True:
         dt = clock.tick(Constants.FPS) / 1000
@@ -130,7 +147,6 @@ def main():
                     aim_x, aim_y = mouse_x, mouse_y
                     aiming = True
                     aiming_screen = False
-                    previous_positions = []
                 elif ball.x - ball.radius < mouse_x < ball.x + ball.radius and ball.y - ball.radius < mouse_y < ball.y + ball.radius:
                     dragging = True
                     drag_start_x, drag_start_y = mouse_x, mouse_y
@@ -164,20 +180,47 @@ def main():
             ball.update(Constants.GAME_SPEED)
             window.fill(Colors.GREEN)
 
-            previous_positions.append((ball.x, ball.y))
 
             ball.show(window)
             hole.show(window)
 
-            if len(previous_positions) > 1:
-                for i in range(len(previous_positions) - 1):
-                    pg.draw.line(window, Colors.RED, previous_positions[i], previous_positions[i + 1], 2)
 
             if hole.check_collision(ball):
                 print("Tebrikler! Deliğe girdiniz!")
                 print(f"Toplam Vuruş Sayısı: {shots}")
                 pg.quit()
                 sys.exit()
+
+            # Su birikintisi kontrolü
+            for puddle in puddles:
+                if puddle.check_collision(ball) and ball.z <= 0:  # Z eksenine bakarak kontrol
+                    if not hit_puddle:  # Sadece bir kez çarpma durumunu işle
+                        print("Top su birikintisine çarptı! Vuruş tekrarlanacak.")
+                        shots += 1  # Vuruş sayısını artır
+
+                        if last_stop_position:  # Eğer önceki bir durma noktası varsa
+                            ball.x, ball.y, ball.z = last_stop_position  # Önceki durma noktasına dön
+                            ball.vx, ball.vy, ball.vz = 0, 0, 0  # Topu durdur
+
+                        hit_puddle = True  # Su birikintisine çarpma durumunu kaydet
+                    break
+            else:  # Hiçbir su birikintisine çarpılmadıysa
+                hit_puddle = False
+
+            # Topun önceki pozisyonunu güncelleme (su birikintisine çarpılmadığında)
+            if not is_ball_stopped and hit_puddle:
+                print("DEBUG: Top durmadı ve su birikintisine çarptı.")
+                print(f"DEBUG: Önceki last_stop_position: {last_stop_position}")
+                print(f"DEBUG: Şimdiki pozisyon: ({ball.x}, {ball.y}, {ball.z})")
+                last_stop_position = (ball.x, ball.y, ball.z)
+                print(f"DEBUG: Yeni last_stop_position: {last_stop_position}")
+            
+            # Top durduysa
+            if is_ball_stopped:  # == True kısmı gereksiz
+                last_stop_position = (ball.x, ball.y, ball.z)  # Durma pozisyonunu güncelle
+                print("DEBUG: Top durdu.")
+            else:  # Top durmadıysa
+                print("DEBUG: Top hala hareket ediyor.")
 
             font = pg.font.Font(None, 36)
             score_text = font.render(f'Vuruş Sayısı: {shots}', True, Colors.WHITE)
@@ -192,20 +235,28 @@ def main():
             if dragging:
                 pg.draw.line(window, Colors.BLUE, (ball.x, ball.y), (mouse_x, mouse_y), 2)
 
+            # Eğer top durduysa bayrağı sıfırla
             is_ball_stopped = (abs(ball.vx) < 0.01 and 
                              abs(ball.vy) < 0.01 and 
                              abs(ball.vz) < 0.01 and 
-                             ball.z <= 0)
+                             ball.z <= 0.06969) # ballz 0.06969 asiri mantiksiz ama calisiyor
 
             if is_ball_stopped and not dragging:
+                last_stop_position = (ball.x, ball.y, ball.z)
                 aiming_screen = True
                 aiming = False
                 ball.vx, ball.vy, ball.vz = 0, 0, 0
-                previous_positions = []
+
+            if last_stop_position:
+                stop_text = font.render(f'Son Durma: ({last_stop_position[0]:.1f}, {last_stop_position[1]:.1f})', True, Colors.WHITE)
+                window.blit(stop_text, (10, 90))
 
         print(f"Topun Konumu: ({ball.x}, {ball.y}, {ball.z})")
+
+        for puddle in puddles:
+            puddle.show(window)  # Su birikintilerini göster
 
         pg.display.flip()
 
 if __name__ == "__main__":
-    main()
+    main() 
