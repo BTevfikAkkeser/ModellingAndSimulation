@@ -113,7 +113,7 @@ class Puddle:
 def main():
     pg.init()
     window = pg.display.set_mode((Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT))
-    pg.display.set_caption("Golf")
+    pg.display.set_caption("Golf Simulation")
     clock = pg.time.Clock()
 
     ball = Ball(Constants.SCREEN_WIDTH // 2, Constants.SCREEN_HEIGHT // 2, z=0)
